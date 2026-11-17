@@ -3,9 +3,14 @@ DDPM LEARNING
 Start with learning_ddpm.ipynb. It contains Markdown explanations, short
 comment-free code cells, saved outputs, and a sampling experiment.
 
-ddpm_learning.pdf is the 28-slide Beamer presentation in the blue Madrid theme.
-ddpm_learning.tex is the complete editable source. Keep figures/ and results/
-with the TeX file when copying it.
+CLASS AND REFERENCE VERSIONS
+
+ddpm_learning_short.pdf is the original 28-slide deck for class.
+ddpm_learning_short.tex is its editable source.
+ddpm_learning.pdf is the retained 48-slide reference deck with derivations.
+ddpm_learning.tex is its editable source.
+Both use the blue Madrid theme. Keep figures/ and results/ with either TeX
+file when copying it.
 
 THE MODEL
 
@@ -60,19 +65,27 @@ Run and save the complete notebook. From DDPM Learning:
 The notebook creates seven vector PDF plots in figures/. The refresh script
 uses only the standard library and reads saved statistics into results/.
 Compilation needs Beamer, listings, and Latin Modern (normal TeX Live/MacTeX).
+To rebuild the class deck, compile ddpm_learning_short.tex twice instead.
 
 The plots assume T=1000 and the original four centers. If you change T,
 change the forward/reverse snapshot timesteps too. Update slide settings,
 code excerpts, and evaluation descriptions when changing the experiment.
 
-TEACHING SEQUENCE
+TEACHING SEQUENCE (48-SLIDE REFERENCE DECK)
 
-Slides 1-4: the goal, comparison with flow matching, and the training data.
-Slides 5-10: forward noise, beta/alpha/alpha_bar, the shortcut, and the prior.
-Slides 11-16: noise prediction, shapes, MSE, the training loop, and loss.
-Slides 17-22: clean estimates, reverse mean and variance, sampling, new inputs.
-Slides 23-28: reverse stages, stochastic paths, distribution checks, an
-experiment removing reverse noise, and student exercises.
+Slides 1-5: notation, the goal, and training data.
+Slides 6-13: the forward schedule, marginal derivation, and Gaussian start.
+Slides 14-22: the network, MSE, its conditional-mean target, and training.
+Slides 23-31: clean estimates, Bayes' rule, completing the square, posterior
+variance and mean, noise substitution, and a worked numerical example.
+Slides 32-34: fixed sampler variance, missing clean-data uncertainty, and t=1.
+Slides 35-37: Gaussian KL, weighted noise MSE, and the simplified objective.
+Slides 38-43: sampling code, reverse stages, trajectories, and samples.
+Slides 44-48: diagnostic definitions, results, noise ablation, and exercises.
+
+The detailed derivation is in the slides themselves. The existing notebook
+and saved experiment outputs are unchanged. The numerical example on slide
+31 uses an illustrative schedule step, not the notebook's actual beta values.
 
 POINTS TO EMPHASIZE
 
@@ -82,6 +95,14 @@ Training uses aggregate noise in the closed-form conditional marginal.
 Independent draws at different noise levels are not a Markov trajectory.
 The network predicts noise, not the velocity used in the ODE lesson.
 Training iteration count and diffusion timestep count are different.
+The tilde in beta_tilde distinguishes posterior variance from forward beta.
+The posterior q(x_{t-1} | x_t, x_0) is Gaussian for t>1. Averaging over
+unknown x_0 generally gives a non-Gaussian true reverse conditional.
+Ideal noise MSE predicts E[epsilon | x_t,t], so the learned-mean formula
+then equals the true reverse mean. Fixed beta_tilde omits uncertainty
+about the clean point and does not give the exact true reverse covariance.
+At t=1 the known-clean-point posterior is a point mass. The sampler's
+last mean is a clean-point estimate; the true q(x_0 | x_1) can be uncertain.
 Only the final reverse step omits noise in the default DDPM sampler.
 The same initial point can have different endpoints with new reverse noises.
 The mean-only experiment is not DDIM or a probability-flow ODE.

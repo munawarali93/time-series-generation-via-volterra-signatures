@@ -3,7 +3,7 @@ DIFFUSION MODELS AND ODE GENERATION
 Start with learning_flow_matching.ipynb. It contains explanations in Markdown,
 comment-free code cells, executed outputs, and student experiments.
 
-flow_matching.pdf is the 28-slide presentation in the blue Madrid theme.
+flow_matching.pdf is the 31-slide presentation in the blue Madrid theme.
 flow_matching.tex is the complete editable Beamer source. Keep figures/ and
 results/ beside it when copying the source.
 
@@ -63,7 +63,10 @@ After running and saving the notebook, run these commands in this folder:
     pdflatex -interaction=nonstopmode -halt-on-error flow_matching.tex
     pdflatex -interaction=nonstopmode -halt-on-error flow_matching.tex
 
-The notebook creates six vector PDF plots in figures/. The refresh script
+The notebook creates six vector PDF plots in figures/.
+The additional diffusion_noise_strip.png is an AI-generated conceptual
+illustration of forward noising, not a model result from this notebook.
+The arrows and explanations on slide 2 describe both directions. The refresh script
 reads the saved evaluation statistics into results/comparison_table.tex.
 It uses only Python's standard library. LaTeX needs Beamer, listings, and
 Latin Modern, available in a normal TeX Live/MacTeX installation.
@@ -73,14 +76,40 @@ change the sampler, change its snapshot indices as well. For architecture,
 center, spread, or training changes, update the slide text and code snippets.
 The refresh script expects the original four-center output format.
 
+VIDEO
+
+videos/gaussian_to_gmm.mp4 is a 13-second animation of 2,000 points moving
+under the trained velocity field. It uses 300 Euler steps for smooth motion.
+The orange reference cloud is sampled independently from the target GMM.
+It does not supply endpoints to the learned sampler.
+
+To reproduce the video, run from this lesson folder:
+
+    python -m pip install imageio-ffmpeg
+    python create_flow_video.py
+
+On its first run, the script repeats the notebook's training with seed 7 and
+5,000 updates, then saves videos/flow_matching_model.pt. Subsequent runs
+load that checkpoint. The script also saves the generated trajectories and
+video_metadata.json. It does not overwrite the notebook's plots or results.
+
+videos/learned_trajectories.mp4 follows the first 24 samples from the saved
+trajectories for 14 seconds. Hollow circles mark starting positions, filled
+dots mark current positions, and growing trails show the paths already
+traveled. Colors indicate the nearest final cluster, assigned afterward.
+Rebuild it without retraining by running:
+
+    python create_trajectory_video.py
+
 TEACHING SEQUENCE
 
-Slides 1-7: the target mixture, data, ODEs, Euler steps, and method names.
-Slides 8-16: interpolation, velocity targets, conditional averaging, the
+Slides 1-10: a diffusion noising illustration, the target mixture and its
+sum, sampling, data, ODEs, Euler steps, and method names.
+Slides 11-19: interpolation, velocity targets, conditional averaging, the
 network, tensor shapes, loss, optimizer, and the training code.
-Slides 17-21: training loss, ODE sampling, new samples, and trajectories.
-Slides 22-25: distribution checks and a controlled Euler step-size experiment.
-Slides 26-28: diffusion's probability-flow ODE, limitations, and exercises.
+Slides 20-24: training loss, ODE sampling, new samples, and trajectories.
+Slides 25-28: distribution checks and a controlled Euler step-size experiment.
+Slides 29-31: diffusion's probability-flow ODE, limitations, and exercises.
 
 KEY DISTINCTIONS
 

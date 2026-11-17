@@ -1,3 +1,7 @@
 torch
 matplotlib
 ipykernel
+numpy
+scipy
+nbformat
+nbclient

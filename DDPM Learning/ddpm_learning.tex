@@ -47,8 +47,20 @@
 
 \begin{frame}
 \titlepage
-\vspace{-5mm}
+\par\vspace{-5mm}
 \centering\textcolor{Teal}{Forward noise \quad Noise prediction \quad Reverse sampling}
+\end{frame}
+
+\begin{frame}{Notation and the learning problem}
+\begin{itemize}\setlength\itemsep{3mm}
+\item $x_0\in\mathbb R^d$ is a clean data point. Here $d=2$.
+\item $t=1,\ldots,T$ counts corruption steps. $x_t$ is a noisy point.
+\item $q$ denotes the fixed forward process and its induced distributions.
+\item $p_\theta$ denotes the learned sampling model. $\theta$ contains the network weights and biases.
+\item $I_d$ is the identity matrix. $\|v\|^2=\sum_{j=1}^d v_j^2$.
+\end{itemize}
+\par\vspace{3mm}
+Training uses clean examples. Generation starts with Gaussian noise and produces new points with approximately the data distribution.
 \end{frame}
 
 \begin{frame}{The same generation problem}
@@ -57,10 +69,10 @@
 \normalsize
 \[\mu_1=(-2,-2),\quad\mu_2=(-2,2),\quad
 \mu_3=(2,-2),\quad\mu_4=(2,2)\]
-\vspace{4mm}
+\par\vspace{4mm}
 \begin{itemize}\setlength\itemsep{4mm}
-\item Start sampling from a two-dimensional standard Gaussian.
-\item Produce new points near all four centers with the right spread.
+\item $\mathcal N(x;\mu_j,0.35^2I_2)$ is a density. The factor $1/4$ gives each component equal probability.
+\item Generate from standard Gaussian noise and produce points near all four centers with the right spread.
 \item Use fresh real samples to check the generated distribution.
 \end{itemize}
 \end{frame}
@@ -77,7 +89,7 @@ Randomness & Initial point & Initial point and reverse steps\\[3mm]
 Endpoints & Noise at 0, data at 1 & Data at 0, noise at $T$\\\bottomrule
 \end{tabular}
 \end{center}
-\vspace{3mm}
+\par\vspace{3mm}
 We now implement a stochastic DDPM sampler, not an ODE flow.
 \end{frame}
 
@@ -119,6 +131,19 @@ x_train = sample_data(4096)
 \ddpmref
 \end{frame}
 
+\begin{frame}{Why these forward-step coefficients?}
+Choose $0<\beta_t<1$ and set $\alpha_t=1-\beta_t$. Then
+\[q(x_t\mid x_{t-1})=\mathcal N(\sqrt{\alpha_t}\,x_{t-1},\beta_t I_d).\]
+Conditioning on $x_{t-1}$ fixes the signal, so the conditional variance is $\beta_t I_d$.
+\par\vspace{3mm}
+If instead $x_{t-1}\sim\mathcal N(0,I_d)$, independent of the fresh noise,
+\[\mathbb E[x_t]=0,\qquad
+\operatorname{Cov}(x_t)=(\alpha_t+\beta_t)I_d=I_d.\]
+Thus a standard Gaussian stays standard Gaussian under this update.
+\par\vspace{3mm}
+For general data, the signal shrinks while noise accumulates. Its variance need not equal 1 at every step.
+\end{frame}
+
 \begin{frame}[fragile]{The noise schedule is fixed before training}
 \begin{lstlisting}
 T = 1000
@@ -126,7 +151,7 @@ beta = torch.linspace(0.0001, 0.02, T)
 alpha = 1 - beta
 alpha_bar = torch.cumprod(alpha, dim=0)
 \end{lstlisting}
-\vspace{3mm}
+\par\vspace{3mm}
 $\beta_t$ is the variance of the fresh noise in one forward step.\\[3mm]
 $\alpha_t=1-\beta_t$ is the squared signal multiplier for that step.\\[3mm]
 \alert{Indexing:} Python \texttt{k} means mathematical timestep $t=k+1$.\\[2mm]
@@ -142,12 +167,30 @@ $\alpha_t=1-\beta_t$ is the squared signal multiplier for that step.\\[3mm]
 \toprule
 Quantity & Meaning\\\midrule
 $\beta_t$ & Variance of newly added noise\\[3mm]
-$\alpha_t$ & Signal retention in one step\\[3mm]
+$\alpha_t$ & Squared signal coefficient in one step\\[3mm]
 $\bar\alpha_t$ & Cumulative squared signal coefficient\\\bottomrule
 \end{tabular}
 \end{center}
-\vspace{4mm}
+\par\vspace{4mm}
 The noise level is determined by the entire schedule up to $t$.
+\end{frame}
+
+\begin{frame}{Deriving the forward marginal}
+Fix $x_0$. At $t=0$, its conditional variance is zero. Suppose
+\[x_{t-1}\mid x_0\sim
+\mathcal N(\sqrt{\bar\alpha_{t-1}}\,x_0,(1-\bar\alpha_{t-1})I_d).\]
+The next step combines this Gaussian with independent Gaussian noise:
+\begin{align*}
+\mathbb E[x_t\mid x_0]
+&=\sqrt{\alpha_t}\sqrt{\bar\alpha_{t-1}}\,x_0
+=\sqrt{\bar\alpha_t}\,x_0,\\[2mm]
+\operatorname{Cov}(x_t\mid x_0)
+&=\bigl[\alpha_t(1-\bar\alpha_{t-1})+\beta_t\bigr]I_d\\
+&=(1-\bar\alpha_t)I_d.
+\end{align*}
+We used $\alpha_t+\beta_t=1$ and $\bar\alpha_t=\alpha_t\bar\alpha_{t-1}$.
+\par\vspace{2mm}
+This induction proves the Gaussian marginal at every timestep.
 \end{frame}
 
 \begin{frame}{A shortcut to any forward noise level}
@@ -160,7 +203,7 @@ The noise level is determined by the entire schedule up to $t$.
 \item $\varepsilon$ represents aggregate noise, not only the final step's noise.
 \item Training can jump directly to a randomly selected timestep.
 \end{itemize}
-\vspace{3mm}
+\par\vspace{3mm}
 Separate shortcut draws at different times are not a Markov trajectory.
 \ddpmref
 \end{frame}
@@ -169,20 +212,24 @@ Separate shortcut draws at different times are not a Markov trajectory.
 \begin{center}
 \includegraphics[width=\textwidth]{figures/forward_noising.pdf}
 \end{center}
-\vspace{4mm}
+\par\vspace{4mm}
 These panels follow one forward Markov simulation for the same 1,500 points.\\[3mm]
 Each forward step uses independent noise. The forward process has no learned parameters.
 \end{frame}
 
 \begin{frame}{Why standard Gaussian noise is a reasonable start}
-\large
-\[\bar\alpha_T\approx0.00004036,\qquad\sqrt{\bar\alpha_T}\approx0.00635\]
-\normalsize
-\vspace{4mm}
-The clean-data contribution is very small by $T=1000$.\\[4mm]
-For this mixture, the four terminal component centers are near zero and their variances are near 1.\\[4mm]
-The terminal distribution is close to standard Gaussian, not exactly equal.\\[4mm]
-Shortening the schedule without checking residual signal can invalidate the initialization.
+For mixture component $j$, write $x_0=\mu_j+0.35\,\xi$, with $\xi\sim\mathcal N(0,I_2)$. The shortcut gives
+\[x_t\mid j\sim\mathcal N\!\left(\sqrt{\bar\alpha_t}\,\mu_j,
+\bigl[0.35^2\bar\alpha_t+1-\bar\alpha_t\bigr]I_2\right).\]
+For the specified 1,000-step schedule,
+\[\bar\alpha_T\approx0.00004036,\qquad\sqrt{\bar\alpha_T}\approx0.00635.\]
+\begin{itemize}\setlength\itemsep{2mm}
+\item Each terminal center has coordinates about $\pm0.0127$.
+\item Each component has variance about $0.999965$ per coordinate.
+\item Their mixture is close to $\mathcal N(0,I_2)$, with a small residual mismatch.
+\end{itemize}
+\par\vspace{2mm}
+Shortening the schedule requires checking the remaining signal again.
 \end{frame}
 
 \begin{frame}[fragile]{3. The network predicts noise}
@@ -209,6 +256,18 @@ Time in the equations is shorthand for the normalized network input.
 \end{columns}
 \end{frame}
 
+\begin{frame}{What the network learns and why it needs time}
+A linear layer maps $h$ to $Wh+b$. The activation between layers is
+\[\operatorname{SiLU}(u)=u\,\operatorname{sigmoid}(u)
+=\frac{u}{1+e^{-u}}\quad\text{coordinate by coordinate}.\]
+The input concatenates the noisy point and its noise-level label $t/T$.
+\par\vspace{3mm}
+The same location $x_t$ can require different corrections at different times. A single network uses $t/T$ to distinguish those tasks.
+\par\vspace{3mm}
+\[\#\theta=(3\cdot64+64)+(64\cdot64+64)+(64\cdot2+2)=4{,}546.\]
+Training adjusts these weights and biases. The schedule stays fixed.
+\end{frame}
+
 \begin{frame}[fragile]{One training example at a random timestep}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 k = torch.randint(T, (256,))
@@ -218,7 +277,7 @@ xt = a.sqrt() * x0 + (1 - a).sqrt() * noise
 t = (k + 1).reshape(-1, 1) / T
 prediction = model(torch.cat([xt, t], dim=1))
 \end{lstlisting}
-\vspace{4mm}
+\par\vspace{4mm}
 \texttt{xt}: $256\times2$, \texttt{t}: $256\times1$, input: $256\times3$.\\[3mm]
 The target is \texttt{noise}, the same noise we used to construct \texttt{xt}.
 \end{frame}
@@ -232,10 +291,38 @@ The target is \texttt{noise}, the same noise we used to construct \texttt{xt}.
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 \end{lstlisting}
-\vspace{3mm}
-PyTorch averages over the batch and both coordinates.\\[3mm]
+\par\vspace{3mm}
+$B=256$ is the batch size. PyTorch averages over all $2B$ coordinates.\\[3mm]
 We use uniformly sampled timesteps and the simplified DDPM objective, not the full variational likelihood bound.
 \ddpmref
+\end{frame}
+
+\begin{frame}{Why noise prediction is a supervised problem}
+We construct every training pair ourselves:
+\[x_0\sim q_{\rm data},\quad t\sim\operatorname{Uniform}\{1,\ldots,T\},
+\quad\varepsilon\sim\mathcal N(0,I_d),\]
+\[x_t=\sqrt{\bar\alpha_t}x_0+\sqrt{1-\bar\alpha_t}\,\varepsilon.
+\]
+The input is $(x_t,t)$ and the known target is $\varepsilon$. The population objective is
+\[L_{\rm simple}(\theta)=\frac1d\,
+\mathbb E_{x_0,t,\varepsilon}\!\left[\|\varepsilon-\varepsilon_\theta(x_t,t)\|^2\right].\]
+\small
+In code, $q_{\rm data}$ is the empirical distribution of the training set. Random timesteps estimate the average loss across all $T$ levels. No clean point or target noise is available during generation.
+\ddpmref
+\end{frame}
+
+\begin{frame}{Why the best noise predictor is a conditional mean}
+Fix $(x_t,t)$ and let $m=\mathbb E[\varepsilon\mid x_t,t]$. For any prediction $f$,
+\begin{align*}
+\mathbb E[\|\varepsilon-f\|^2\mid x_t,t]
+&=\mathbb E[\|\varepsilon-m\|^2\mid x_t,t]+\|m-f\|^2.
+\end{align*}
+Expand $\varepsilon-f=(\varepsilon-m)+(m-f)$. The cross term vanishes because $\mathbb E[\varepsilon-m\mid x_t,t]=0$.
+\par\vspace{3mm}
+\[\boxed{\varepsilon_*(x_t,t)=\mathbb E[\varepsilon\mid x_t,t]}\]
+Many pairs $(x_0,\varepsilon)$ can produce the same noisy point. The first term is the remaining uncertainty, so even an ideal network generally has positive loss.
+\par\vspace{2mm}
+Predicting zero has loss $\mathbb E\|\varepsilon\|^2/d=1$.
 \end{frame}
 
 \begin{frame}[fragile]{5. Training: construct noisy inputs}
@@ -251,7 +338,7 @@ for step in range(10000):
     prediction = model(torch.cat([xt, t], dim=1))
     loss = loss_fn(prediction, noise)
 \end{lstlisting}
-\vspace{3mm}
+\par\vspace{3mm}
 No full forward chain is needed for each training example.
 \end{frame}
 
@@ -263,7 +350,9 @@ Continuation inside the same loop:
     optimizer.step()
     history.append(loss.item())
 \end{lstlisting}
-\vspace{4mm}
+\par\vspace{4mm}
+\small
+\texttt{zero\_grad} clears old gradients. \texttt{backward} computes $\nabla_\theta L$ by the chain rule. Adam uses these gradients to update $\theta$.\\[3mm]
 10,000 \alert{training iterations} update the weights.\\[3mm]
 1,000 \alert{diffusion timesteps} define the corruption and sampling chain.\\[3mm]
 Each training iteration samples examples from many diffusion timesteps.
@@ -283,22 +372,133 @@ From $x_t=\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\varepsilon$,
 \large
 \[\widehat x_0=\frac{x_t-\sqrt{1-\bar\alpha_t}\,\varepsilon_\theta(x_t,t)}{\sqrt{\bar\alpha_t}}\]
 \normalsize
-\vspace{5mm}
-This explains why predicting noise helps denoising.\\[4mm]
+\par\vspace{5mm}
+With the ideal predictor, $\widehat x_0=\mathbb E[x_0\mid x_t,t]$ by taking conditional expectations of the forward equation.\\[4mm]
 At high noise, the denominator is small and a one-shot estimate can be inaccurate.\\[4mm]
 DDPM instead constructs a sequence of reverse transitions.
 \end{frame}
 
-\begin{frame}{6. The learned reverse mean}
-\large
-\[\boxed{\mu_\theta(x_t,t)=\frac{1}{\sqrt{\alpha_t}}
-\left(x_t-\frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\varepsilon_\theta(x_t,t)\right)}\]
-\normalsize
-\vspace{5mm}
-The network predicts noise; the schedule converts that prediction into a mean for $x_{t-1}$.\\[4mm]
-This is not simply $x_t-\varepsilon_\theta$. Both schedule factors matter.\\[4mm]
-The reverse transition also needs a variance.
+\begin{frame}{Three distributions in the reverse calculation}
+\begin{description}\setlength\itemsep{3mm}
+\item[$q(x_{t-1}\mid x_t,x_0)$] The forward posterior with the clean point known. We can calculate it exactly as a Gaussian for $t>1$.
+\item[$q(x_{t-1}\mid x_t)$] The true reverse conditional with the clean point unknown. It averages over possible clean points and can be non-Gaussian.
+\item[$p_\theta(x_{t-1}\mid x_t)$] Our learned Gaussian approximation, determined by a network mean and a chosen variance.
+\end{description}
+\par\vspace{3mm}
+We first derive the tractable posterior. Then we use its structure to construct a sampler that only needs $x_t$ and $t$.
 \ddpmref
+\end{frame}
+
+\begin{frame}{Bayes' rule gives the tractable posterior}
+For $t>1$, put $y=x_{t-1}$. Bayes' rule and the forward Markov property give
+\[q(y\mid x_t,x_0)\propto q(x_t\mid y)\,q(y\mid x_0).\]
+The omitted normalizing factor depends on $x_t,x_0$, but not on $y$.
+\begin{align*}
+q(x_t\mid y)&=\mathcal N(x_t;\sqrt{\alpha_t}\,y,\beta_t I_d),\\[2mm]
+q(y\mid x_0)&=\mathcal N(y;\sqrt{\bar\alpha_{t-1}}\,x_0,
+(1-\bar\alpha_{t-1})I_d).
+\end{align*}
+Hence, as a function of $y$,
+\[q(y\mid x_t,x_0)\propto\exp\!\left[-\frac12\left(
+\frac{\|x_t-\sqrt{\alpha_t}y\|^2}{\beta_t}
++\frac{\|y-\sqrt{\bar\alpha_{t-1}}x_0\|^2}{1-\bar\alpha_{t-1}}
+\right)\right].\]
+\end{frame}
+
+\begin{frame}{Completing the square identifies mean and variance}
+Expand the two squared norms and collect the terms involving $y$:
+\[q(y\mid x_t,x_0)\propto\exp[-\tfrac12(A_t\|y\|^2-2b_t^\top y)],\]
+\[A_t=\frac{\alpha_t}{\beta_t}+\frac{1}{1-\bar\alpha_{t-1}},
+\qquad b_t=\frac{\sqrt{\alpha_t}}{\beta_t}x_t+
+\frac{\sqrt{\bar\alpha_{t-1}}}{1-\bar\alpha_{t-1}}x_0.\]
+Here $A_t$ is a positive scalar and $b_t\in\mathbb R^d$.
+\[A_t\|y\|^2-2b_t^\top y
+=A_t\left\|y-\frac{b_t}{A_t}\right\|^2-\frac{\|b_t\|^2}{A_t}.\]
+The last term is constant in $y$. Comparing with a Gaussian density gives
+\[\boxed{\tilde\mu_t=\frac{b_t}{A_t},\qquad
+\tilde\beta_t=\frac1{A_t}.}\]
+The scalar $A_t$ is the precision, or inverse variance per coordinate.
+\end{frame}
+
+\begin{frame}{Deriving the posterior variance}
+Starting with the precision from the previous slide,
+\begin{align*}
+\tilde\beta_t
+&=\left(\frac{\alpha_t}{\beta_t}+\frac1{1-\bar\alpha_{t-1}}\right)^{-1}\\[2mm]
+&=\frac{\beta_t(1-\bar\alpha_{t-1})}
+{\alpha_t(1-\bar\alpha_{t-1})+\beta_t}\\[2mm]
+&=\boxed{\beta_t\frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}}.
+\end{align*}
+The denominator simplifies because
+\[\alpha_t(1-\bar\alpha_{t-1})+\beta_t
+=1-\alpha_t\bar\alpha_{t-1}=1-\bar\alpha_t.\]
+The tilde distinguishes $\tilde\beta_t$ from the forward-step variance $\beta_t$.
+\ddpmref
+\end{frame}
+
+\begin{frame}{Deriving the posterior mean}
+Multiply $b_t$ by the variance we just calculated:
+\begin{align*}
+\tilde\mu_t(x_t,x_0)
+&=\tilde\beta_t\left(
+\frac{\sqrt{\alpha_t}}{\beta_t}x_t+
+\frac{\sqrt{\bar\alpha_{t-1}}}{1-\bar\alpha_{t-1}}x_0\right)\\[3mm]
+&=\underbrace{\frac{\sqrt{\alpha_t}(1-\bar\alpha_{t-1})}{1-\bar\alpha_t}}_{c_t}x_t
++\underbrace{\frac{\beta_t\sqrt{\bar\alpha_{t-1}}}{1-\bar\alpha_t}}_{d_t}x_0.
+\end{align*}
+Thus
+\[q(x_{t-1}\mid x_t,x_0)=\mathcal N(c_tx_t+d_tx_0,\tilde\beta_t I_d),\qquad t>1.\]
+Both coefficients come from combining the two Gaussian factors. This is an exact conditional mean when the clean $x_0$ is known.
+\ddpmref
+\end{frame}
+
+\begin{frame}{Rewriting that mean in terms of aggregate noise}
+Solve the forward shortcut for the clean point:
+\[x_0=\frac{x_t-\sqrt{1-\bar\alpha_t}\,\varepsilon}{\sqrt{\bar\alpha_t}}.\]
+Since $\bar\alpha_t=\alpha_t\bar\alpha_{t-1}$, substitution into $c_tx_t+d_tx_0$ gives
+\begin{align*}
+\tilde\mu_t
+&=\frac{\alpha_t(1-\bar\alpha_{t-1})+\beta_t}
+{\sqrt{\alpha_t}(1-\bar\alpha_t)}x_t
+-\frac{\beta_t}{\sqrt{\alpha_t}\sqrt{1-\bar\alpha_t}}\varepsilon\\[3mm]
+&=\boxed{\frac1{\sqrt{\alpha_t}}
+\left(x_t-\frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\varepsilon\right)}.
+\end{align*}
+The numerator of the first coefficient equals $1-\bar\alpha_t$. This cancellation explains both schedule factors in the reverse mean.
+\end{frame}
+
+\begin{frame}{6. The learned reverse mean}
+Use the network's prediction in place of the unknown aggregate noise:
+\[\boxed{\mu_\theta(x_t,t)=\frac{1}{\sqrt{\alpha_t}}
+\left(x_t-\frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\varepsilon_\theta(x_t,t)\right).}\]
+Why does this target the correct mean? The conditional-expectation rule gives
+\begin{align*}
+\mathbb E[x_{t-1}\mid x_t]
+&=\mathbb E[\tilde\mu_t(x_t,x_0)\mid x_t]\\[1mm]
+&=\frac1{\sqrt{\alpha_t}}\left(x_t-
+\frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\mathbb E[\varepsilon\mid x_t]\right).
+\end{align*}
+MSE targets exactly this conditional noise mean at each fixed $t$. An ideal predictor therefore gives the true reverse mean, even when the full reverse distribution is non-Gaussian.
+\ddpmref
+\end{frame}
+
+\begin{frame}{A numerical check of both formulas}
+\small
+For one coordinate, choose an illustrative step with
+\[\alpha_t=0.9,\quad\beta_t=0.1,\quad\bar\alpha_{t-1}=0.8,
+\quad\bar\alpha_t=0.72.\]
+Take $x_0=1$ and aggregate noise $\varepsilon=0.5$. Then
+\[x_t=\sqrt{0.72}+\sqrt{0.28}(0.5)\approx1.113103.\]
+\[\tilde\beta_t=\frac{0.1\cdot0.2}{0.28}=0.071429,
+\qquad \sqrt{\tilde\beta_t}\approx0.267261.\]
+The two expressions for the posterior mean agree:
+\begin{align*}
+\tilde\mu_t&=\frac{\sqrt{0.9}\cdot0.2}{0.28}(1.113103)
++\frac{0.1\sqrt{0.8}}{0.28}(1)\approx1.073711,\\[1mm]
+\tilde\mu_t&=\frac1{\sqrt{0.9}}\left(1.113103-
+\frac{0.1}{\sqrt{0.28}}(0.5)\right)\approx1.073711.
+\end{align*}
+This checks the exact posterior using known noise. The sampler substitutes the network output for that noise.
 \end{frame}
 
 \begin{frame}[fragile]{A fixed reverse variance}
@@ -314,6 +514,75 @@ $\tilde\beta_1=0$. The final sampling step adds no noise.
 \ddpmref
 \end{frame}
 
+\begin{frame}{Why the posterior variance is a modeling choice}
+The true reverse distribution averages over unknown clean points:
+\[q(x_{t-1}\mid x_t)=\int q(x_{t-1}\mid x_t,x_0)\,q(x_0\mid x_t)\,dx_0.\]
+Recall $\tilde\mu_t=c_tx_t+d_tx_0$. The conditional covariance identity gives
+\[\boxed{\operatorname{Cov}(x_{t-1}\mid x_t)
+=\tilde\beta_t I_d+d_t^2\operatorname{Cov}(x_0\mid x_t).}\]
+The terms are uncertainty within each posterior and uncertainty about its mean as $x_0$ varies.
+\par\vspace{3mm}
+Our choice $p_\theta=\mathcal N(\mu_\theta,\tilde\beta_t I_d)$ for $t>1$ omits the second term. Matching the mean alone does not make this Gaussian the exact reverse conditional.
+\end{frame}
+
+\begin{frame}{The last step and variance sanity checks}
+Because $\bar\alpha_t=\alpha_t\bar\alpha_{t-1}\leq\bar\alpha_{t-1}$,
+\[0\leq\tilde\beta_t=\beta_t\frac{1-\bar\alpha_{t-1}}{1-\bar\alpha_t}\leq\beta_t.\]
+At $t=1$, $\bar\alpha_0=1$, so $\tilde\beta_1=0$. The posterior conditioned on $x_0$ is a point mass at that already known $x_0$.
+\par\vspace{2mm}
+The mean formula still makes sense:
+\[\mu_\theta(x_1,1)=\frac{x_1-\sqrt{\beta_1}\,\varepsilon_\theta(x_1,1)}{\sqrt{\alpha_1}}
+=\widehat x_0.\]
+Our sampler returns this estimate without fresh noise. The true $q(x_0\mid x_1)$ can still have uncertainty.
+\par\vspace{2mm}
+\small The square-completion proof used $t>1$ to avoid division by zero. At high noise, $\bar\alpha_{t-1}\approx0$ gives $\tilde\beta_t\approx\beta_t$.
+\end{frame}
+
+\begin{frame}{Why Gaussian KL reduces to a squared mean error}
+\small
+Let $Q=\mathcal N(m,vI_d)$ and $P=\mathcal N(n,sI_d)$ with $v,s>0$.
+The KL divergence measures their difference using
+\[D_{\rm KL}(Q\|P)=\mathbb E_{X\sim Q}\!\left[\log\frac{Q(X)}{P(X)}\right].\]
+Insert the Gaussian density formula:
+\[D_{\rm KL}(Q\|P)=\frac d2\log\frac{s}{v}
+-\frac{\mathbb E_Q\|X-m\|^2}{2v}
++\frac{\mathbb E_Q\|X-n\|^2}{2s}.\]
+Because $\mathbb E_Q[X-m]=0$,
+\[\mathbb E_Q\|X-m\|^2=dv,\qquad
+\mathbb E_Q\|X-n\|^2=dv+\|m-n\|^2.\]
+Therefore
+\[\boxed{D_{\rm KL}(Q\|P)=\frac d2\left(\log\frac{s}{v}-1+\frac vs\right)
++\frac{\|m-n\|^2}{2s}.}\]
+For fixed variances, minimizing KL over $n$ minimizes a squared mean error.
+\end{frame}
+
+\begin{frame}{Why noise MSE also trains a reverse mean}
+For $t>1$, compare the exact posterior $q=\mathcal N(\tilde\mu_t,\tilde\beta_t I_d)$ with $p_\theta=\mathcal N(\mu_\theta,\sigma_t^2 I_d)$, where $\sigma_t^2>0$ is fixed.
+\[D_{\rm KL}(q\|p_\theta)=\mathbb E_q\!\left[\log\frac{q}{p_\theta}\right]
+=C_t+\frac{\|\tilde\mu_t-\mu_\theta\|^2}{2\sigma_t^2}.\]
+$C_t$ is independent of $\theta$. Subtracting the two noise-form means gives
+\[\tilde\mu_t-\mu_\theta
+=\frac{\beta_t}{\sqrt{\alpha_t}\sqrt{1-\bar\alpha_t}}
+(\varepsilon_\theta-\varepsilon).\]
+Therefore the parameter-dependent part of this Gaussian divergence is
+\[\boxed{\frac{\beta_t^2}{2\sigma_t^2\alpha_t(1-\bar\alpha_t)}
+\|\varepsilon-\varepsilon_\theta(x_t,t)\|^2.}\]
+\ddpmref
+\end{frame}
+
+\begin{frame}{What the simplified objective leaves out}
+The likelihood-bound approach combines a terminal-prior term, reverse-step KL terms for $t>1$, and a separate endpoint reconstruction term.
+\par\vspace{4mm}
+The reverse-step terms have weights
+\[w_t=\frac{\beta_t^2}{2\sigma_t^2\alpha_t(1-\bar\alpha_t)}.\]
+Our notebook samples $t$ uniformly and uses unweighted noise MSE at every $t$, including $t=1$. This changes how training balances the noise levels.
+\par\vspace{4mm}
+It retains the conditional-mean target in the ideal unrestricted setting, while shared network capacity can make weighting matter in practice.
+\par\vspace{3mm}
+\small We do not evaluate a likelihood bound for the deterministic final step, and we do not insert $\sigma_1^2=0$ into a Gaussian KL formula.
+\ddpmref
+\end{frame}
+
 \begin{frame}[fragile]{Sampling: compute each reverse mean}
 \begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
 def generate(z, stochastic=True):
@@ -326,7 +595,7 @@ def generate(z, stochastic=True):
             x = (x - beta[k] * predicted_noise
                  / (1 - alpha_bar[k]).sqrt()) / alpha[k].sqrt()
 \end{lstlisting}
-\vspace{3mm}
+\par\vspace{3mm}
 Python indices descend from 999 to 0. The corresponding mathematical timesteps descend from 1,000 to 1.
 \end{frame}
 
@@ -339,7 +608,7 @@ Continuation of the same function:
     return x, torch.stack(path)
 \end{lstlisting}
 \[x_{t-1}=\mu_\theta(x_t,t)+\sqrt{\tilde\beta_t}\,z_t\qquad(t>1)\]
-\vspace{3mm}
+\par\vspace{3mm}
 Fresh $z_t\sim\mathcal N(0,I_2)$ at each reverse step.\\[3mm]
 The default is stochastic DDPM. We use \texttt{False} only for an ablation.\\[3mm]
 We do not clip coordinates to image bounds such as $[-1,1]$.
@@ -353,7 +622,7 @@ z = torch.randn(5000, 2)
 real_test = sample_data(5000)
 generated, path = generate(z)
 \end{lstlisting}
-\vspace{4mm}
+\par\vspace{4mm}
 \texttt{real\_test} is only for evaluation. It does not enter the sampler.\\[3mm]
 \texttt{path[0]} is $x_T$; \texttt{path[T]} is the generated $x_0$.\\[3mm]
 The same initial point can yield different outputs with new reverse noises.
@@ -363,7 +632,7 @@ The same initial point can yield different outputs with new reverse noises.
 \begin{center}
 \includegraphics[width=\textwidth]{figures/reverse_sampling.pdf}
 \end{center}
-\vspace{5mm}
+\par\vspace{5mm}
 These panels follow the same 1,500 particles. Time now runs backward.\\[3mm]
 Individual steps include noise even while the whole distribution develops structure.
 \end{frame}
@@ -393,14 +662,44 @@ Equal axes; 2,000 points shown per panel.\\[2mm]
 Look for all four clusters, appropriate proportions, and the correct spread.
 \end{frame}
 
+\begin{frame}{Definitions of the distribution diagnostics}
+For generated or real points $x_1,\ldots,x_N$, define
+\[r_i=\min_{1\leq j\leq4}\|x_i-\mu_j\|,
+\qquad j_i=\operatorname*{argmin}_{1\leq j\leq4}\|x_i-\mu_j\|.\]
+\begin{itemize}\setlength\itemsep{3mm}
+\item Nearest-center proportion: $\frac{100}{N}\sum_i\mathbf1\{j_i=j\}$ percent.
+\item RMS distance: $\sqrt{\frac1N\sum_i r_i^2}$.
+\item Within distance 1: $\frac{100}{N}\sum_i\mathbf1\{r_i\leq1\}$ percent.
+\end{itemize}
+\par\vspace{3mm}
+$\mathbf1\{A\}$ equals 1 when $A$ holds and 0 otherwise. For a known true component, $\mathbb E\|x-\mu_j\|^2=2(0.35)^2$, giving RMS $\sqrt2(0.35)\approx0.495$.
+\par\vspace{2mm}
+\small Nearest-center assignment can differ from the true label. Sampling variation also changes empirical percentages and radii.
+\end{frame}
+
 \begin{frame}{Distribution checks on 5,000 samples}
 \begin{center}
 \small\input{results/comparison_table.tex}
 \end{center}
-\vspace{3mm}
+\par\vspace{3mm}
 Nearest-center counts check coverage; they do not identify true component labels.\\[3mm]
 Smaller radius is not automatically better. A collapsed cluster has radius zero.\\[2mm]
 \small These diagnostics do not certify a full distribution match.
+\end{frame}
+
+\begin{frame}{Why removing reverse noise changes the distribution}
+For the implemented stochastic update at $t>1$,
+\[X_{t-1}=\mu_\theta(X_t,t)+\sqrt{\tilde\beta_t}\,Z_t,
+\qquad Z_t\sim\mathcal N(0,I_d)\ \text{independent of }X_t.\]
+For the same input distribution of $X_t$,
+\begin{align*}
+\mathbb E[X_{t-1}]&=\mathbb E[\mu_\theta(X_t,t)],\\[2mm]
+\operatorname{Cov}(X_{t-1})
+&=\operatorname{Cov}(\mu_\theta(X_t,t))+\tilde\beta_t I_d.
+\end{align*}
+A mean-only step removes the second term. It averages over possible outcomes instead of drawing one from the chosen transition.
+\par\vspace{3mm}
+Later inputs then have different distributions, so the effect compounds. A deterministic sampler such as DDIM uses a separately derived update.
 \end{frame}
 
 \begin{frame}{Experiment: removing reverse-step noise}
@@ -421,7 +720,7 @@ This mean-only chain is not DDIM or a probability-flow ODE.
 \item Shorten $T$ and check $\bar\alpha_T$ before retraining.
 \item Keep the same starting point and change the reverse noise draws.
 \end{enumerate}
-\vspace{3mm}
+\par\vspace{3mm}
 Do not simply skip timesteps with the original one-step coefficients.\\[2mm]
 Use fresh test data after tuning. These examples are not a controlled ranking of DDPM versus ODE generation.
 \vfill

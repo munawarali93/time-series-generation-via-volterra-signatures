@@ -51,31 +51,87 @@
 \centering\textcolor{Teal}{Data \quad Velocity \quad Training \quad ODE sampling}
 \end{frame}
 
+\begin{frame}{Diffusion: adding noise and learning to remove it}
+\setlength{\abovedisplayskip}{4pt}
+\setlength{\belowdisplayskip}{4pt}
+\centering
+\textcolor{Teal}{Forward process: gradually add Gaussian noise}
+\[\text{Clean image}\quad\xrightarrow{\hspace*{8cm}}\quad\text{Noise}\]
+\includegraphics[width=.97\textwidth,height=.28\textheight,keepaspectratio,trim=0 168bp 0 134bp,clip]{figures/diffusion_noise_strip.png}
+\par
+\[\text{Image sample}\quad\xleftarrow{\hspace*{7.6cm}}\quad\text{Fresh noise}\]
+\textcolor{Teal}{Generation: use a trained model for successive denoising steps}
+\par\vspace{3mm}\raggedright\small
+Generation starts from fresh noise and produces a new image sample.\\[2mm]
+Our flow-matching notebook learns a velocity to move points from noise to data.
+\vfill{\tiny\color{gray}Conceptual AI-generated illustration, not output from this notebook.
+Diffusion reference: Ho et al., \href{https://arxiv.org/abs/2006.11239}{Denoising Diffusion Probabilistic Models}.}
+\end{frame}
+
 \begin{frame}{Our goal: generate a mixture from Gaussian noise}
 \large
 \[X(0)\sim\mathcal N(0,I_2)\]
-\[X(1)\ \text{approximately follows}\quad
-\frac14\sum_{j=1}^4\mathcal N(\mu_j,0.35^2I_2)\]
+\[X(1)\ \text{should look like samples from four Gaussian clusters.}\]
 \normalsize
 \begin{itemize}\setlength\itemsep{4mm}
 \item One sample is a point with two coordinates.
+\item The target gives each cluster a $25\%$ chance of supplying a sample.
 \item We learn a velocity field that moves a cloud of points.
 \item A fresh Gaussian starting point produces a new generated sample.
 \end{itemize}
+\vspace{3mm}
+The next slides explain the Gaussian mixture model (GMM) that defines this target.
+\end{frame}
+
+\begin{frame}{The sum in a Gaussian mixture model}
+The target is a weighted mixture of four Gaussian distributions:
+\[P_{\rm target}=\frac14\sum_{j=1}^4\mathcal N(\mu_j,0.35^2I_2).\]
+Let $p_j(x)$ be Gaussian $j$'s probability density at position $x$. Then
+\[\boxed{p_{\rm target}(x)=\tfrac14p_1(x)+\tfrac14p_2(x)
++\tfrac14p_3(x)+\tfrac14p_4(x).}\]
+\begin{itemize}\setlength\itemsep{2mm}
+\item $j=1,2,3,4$ labels the four clusters. $\mu_j$ is cluster $j$'s center.
+\item Each $1/4$ is the probability of choosing that cluster.
+\item The sum combines probability densities. To sample, choose just one cluster.
+\end{itemize}
+\vspace{2mm}
+Adding or averaging four sampled points would produce a different distribution.
 \end{frame}
 
 \begin{frame}{What is a four-component Gaussian mixture?}
 \[\mu_1=(-2,-2),\quad\mu_2=(-2,2),\quad
 \mu_3=(2,-2),\quad\mu_4=(2,2)\]
-\vspace{3mm}
-\begin{enumerate}\setlength\itemsep{4mm}
+\vspace{1mm}
+\begin{enumerate}\setlength\itemsep{2mm}
 \item Choose one center with probability $1/4$.
 \item Draw $\varepsilon\sim\mathcal N(0,I_2)$.
 \item Return $x=\mu_j+0.35\varepsilon$.
 \end{enumerate}
-\vspace{5mm}
-The covariance is $0.35^2 I_2$. Each cluster has width, not just a single point.\\[3mm]
-Direct sampling already works. We use the known mixture to teach and check a learned generator.
+\vspace{3mm}
+Here $I_2=\begin{pmatrix}1&0\\0&1\end{pmatrix}$, so the covariance is
+$0.35^2I_2=\begin{pmatrix}0.1225&0\\0&0.1225\end{pmatrix}$.\\[3mm]
+Each coordinate has standard deviation $0.35$. The coordinate noises are independent.\\[3mm]
+We use this known mixture to teach and check a learned generator.
+\end{frame}
+
+\begin{frame}{Why the four probabilities add}
+Suppose $A$ is a region of the plane. Write $P_j(A)$ for the chance that
+Gaussian $j$ produces a point in $A$.
+\vspace{3mm}
+One sample comes from exactly one of four choices:
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Way to produce a point in $A$ & Probability\\\midrule
+Choose cluster 1, then land in $A$ & $\tfrac14P_1(A)$\\[2mm]
+Choose cluster 2, then land in $A$ & $\tfrac14P_2(A)$\\[2mm]
+Choose cluster 3, then land in $A$ & $\tfrac14P_3(A)$\\[2mm]
+Choose cluster 4, then land in $A$ & $\tfrac14P_4(A)$\\\bottomrule
+\end{tabular}
+\end{center}
+These choices are mutually exclusive, so their probabilities add:
+\[P_{\rm target}(A)=\tfrac14\sum_{j=1}^4P_j(A).\]
+For the whole plane, each $P_j(A)=1$, giving total probability $\tfrac14(4)=1$.
 \end{frame}
 
 \begin{frame}[fragile]{1. Create the training data}
@@ -129,6 +185,8 @@ An illustrative calculation:
 We approximate a short motion using the velocity at the start of the step.\\[3mm]
 At the next step, evaluate the velocity at the new position and time.
 \end{frame}
+
+
 
 \begin{frame}{Diffusion and flow matching: related approaches}
 \begin{center}

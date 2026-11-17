@@ -15,6 +15,7 @@ The weeks below describe the teaching sequence, rather than calendar dates. “M
 | 3 | Understanding GANs | Train a generator and discriminator on a simple scalar distribution. Generate new samples and compare distributions. | Notebook and slides ready. |
 | 4 | Diffusion models and ODE generation | Learn a velocity field by flow matching, then use Euler steps to turn Gaussian noise into a four-component Gaussian mixture. Explain the connection to diffusion's probability-flow ODE. | Notebook and slides ready. |
 | 5 | Denoising diffusion probabilistic models (DDPM) | Generate the same four-component mixture using a fixed forward noise schedule, noise-prediction training, and stochastic reverse sampling. | Notebook and slides ready. |
+| 6 | Wasserstein distance and distribution comparison | Derive Gaussian distances, compute optimal transport, and compare image and time-series representations with Wasserstein distance and MMD. | Notebook and 35-slide Beamer presentation ready. |
 | Later | Time series generation via Volterra signatures | Study the relevant theory, design a time series experiment, and investigate how Volterra signatures can be used for generation or evaluation. | Planned; method and experiments remain to be developed. |
 
 The current examples teach the prerequisites. They do not yet implement Volterra signatures or a time series generator.
@@ -42,7 +43,7 @@ This lesson uses synthetic scalar data from a normal distribution with mean 2 an
 ### Diffusion models and ODE generation: four Gaussian components
 
 - [Executed notebook](Diffusion%20and%20Flow%20Matching/learning_flow_matching.ipynb)
-- [28-slide Beamer PDF](Diffusion%20and%20Flow%20Matching/flow_matching.pdf)
+- [31-slide Beamer PDF](Diffusion%20and%20Flow%20Matching/flow_matching.pdf)
 - [Editable LaTeX source](Diffusion%20and%20Flow%20Matching/flow_matching.tex)
 - [Setup and teaching notes](Diffusion%20and%20Flow%20Matching/README.txt)
 
@@ -53,13 +54,27 @@ The implemented method learns a velocity directly. It is not a DDPM or a stochas
 ### DDPM: learning to reverse Gaussian noise
 
 - [Executed notebook](DDPM%20Learning/learning_ddpm.ipynb)
-- [28-slide blue Beamer PDF](DDPM%20Learning/ddpm_learning.pdf)
-- [Editable LaTeX source](DDPM%20Learning/ddpm_learning.tex)
+- [Short class deck: 28 slides](DDPM%20Learning/ddpm_learning_short.pdf)
+- [Short deck LaTeX source](DDPM%20Learning/ddpm_learning_short.tex)
+- [Long reference deck: 48 slides](DDPM%20Learning/ddpm_learning.pdf)
+- [Reference deck LaTeX source](DDPM%20Learning/ddpm_learning.tex)
 - [Setup and teaching notes](DDPM%20Learning/README.txt)
 
-This lesson uses the same four Gaussian components as the ODE lesson. A small network learns to predict the noise added at a randomly selected diffusion timestep. Sampling starts from standard Gaussian noise and follows 1,000 reverse transitions, with fresh noise at every step except the last. The notebook includes forward noising, training loss, reverse point clouds, stochastic trajectories, and evaluation against fresh real samples.
+This lesson uses the same four Gaussian components as the ODE lesson. The slides derive the forward marginal, Gaussian posterior mean and variance, noise-prediction parameterization, and the connection between noise MSE and reverse-step fitting. They also explain the fixed-variance approximation and the final sampling step. A small network learns to predict the noise added at a randomly selected diffusion timestep. Sampling starts from standard Gaussian noise and follows 1,000 reverse transitions, with fresh noise at every step except the last. The notebook includes forward noising, training loss, reverse point clouds, stochastic trajectories, and evaluation against fresh real samples.
 
 An experiment removes the reverse-step noise while keeping the same initial points. The resulting distorted clusters illustrate why a mean-only chain is a different sampler; it is not DDIM or a probability-flow ODE. The saved DDPM run covers all four modes but has somewhat tighter clusters than the target. These teaching examples are not a controlled comparison of methods.
+
+### Wasserstein distance: probability mass, geometry, and computation
+
+- [Executed notebook](Wasserstein%20Distance/learning_wasserstein.ipynb)
+- [35-slide blue Beamer PDF](Wasserstein%20Distance/wasserstein_distance.pdf)
+- [Editable LaTeX source](Wasserstein%20Distance/wasserstein_distance.tex)
+- [Runnable Python lesson](Wasserstein%20Distance/learning_wasserstein.py)
+- [Setup, instructor notes, and worked exercises](Wasserstein%20Distance/README.txt)
+
+This lesson derives one-dimensional Gaussian W1 and W2 distances for changes in mean, variance, or both. Tiny examples cover sorted samples, weighted transport plans, a linear-programming solver, log-domain Sinkhorn, and finite-sample uncertainty. Thirteen reproducible figures accompany the code.
+
+The image example distinguishes brightness histograms from spatial probability mass. The time-series examples compare amplitude distributions, time-amplitude clouds, windows, whole paths, and ordinary time-augmented signatures through level three. A deliberate collision at signature levels one and two illustrates information lost through truncation. The lesson also introduces Gaussian-kernel MMD and explains its relation to representation choices. These examples do not implement Volterra signatures.
 
 ## Running the notebooks
 
@@ -80,7 +95,7 @@ python -m pip install jupyterlab
 jupyter lab
 ```
 
-The notebooks include saved outputs, so they can also be read without rerunning them. Results can differ across seeds, package versions, and platforms. GAN training is especially sensitive to these choices; compare the generated distribution rather than relying only on the losses.
+The notebooks include saved outputs, so they can also be read without rerunning them. Results can differ across seeds, package versions, and platforms. GAN training is especially sensitive to these choices; compare the generated distribution rather than relying only on the losses. The Wasserstein lesson also provides a standalone Python script and mathematical checks, with commands in its README.
 
 ## Rebuilding a presentation
 
@@ -103,5 +118,7 @@ After running and saving a notebook, open a terminal in its lesson folder and ru
 - Song et al., [Score-Based Generative Modeling through Stochastic Differential Equations](https://arxiv.org/abs/2011.13456).
 - Ho, Jain, and Abbeel (2020), [Denoising Diffusion Probabilistic Models](https://arxiv.org/abs/2006.11239).
 - Song, Meng, and Ermon, [Denoising Diffusion Implicit Models](https://arxiv.org/abs/2010.02502).
+- Peyre and Cuturi, [Computational Optimal Transport](https://arxiv.org/abs/1803.00567).
+- Gretton et al. (2012), [A Kernel Two-Sample Test](https://jmlr.org/papers/v13/gretton12a.html).
 
 This repository records a teaching and research project in progress.

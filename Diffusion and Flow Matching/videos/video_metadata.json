@@ -1,0 +1,23 @@
+{
+  "training_seed": 7,
+  "training_updates": 5000,
+  "sampling_seed": 2026,
+  "points": 2000,
+  "euler_steps": 300,
+  "fps": 30,
+  "frames": 390,
+  "duration_seconds": 13.0,
+  "resolution": [
+    1280,
+    720
+  ],
+  "nearest_center_shares": [
+    0.2630000114440918,
+    0.2615000009536743,
+    0.23549999296665192,
+    0.23999999463558197
+  ],
+  "rms_distance_to_nearest_center": 0.5290876030921936,
+  "torch_version": "2.14.1",
+  "note": "Learned ODE output, not interpolation to selected GMM endpoints."
+}
